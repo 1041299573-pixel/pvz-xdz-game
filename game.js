@@ -9,7 +9,7 @@ const LEVELS = [
   { name: '路障来袭', waves: 3, baseCount: 6, step: 1, spawnGap: 2050, health: 1.12, speed: 1.04, damage: 1.06, coneEvery: 3, bucketEvery: 5, sockEvery: 0 },
   { name: '铁桶防线', waves: 4, baseCount: 6, step: 1, spawnGap: 1800, health: 1.25, speed: 1.08, damage: 1.12, coneEvery: 3, bucketEvery: 4, sockEvery: 7 },
   { name: '袜子危机', waves: 4, baseCount: 7, step: 1, spawnGap: 1550, health: 1.42, speed: 1.13, damage: 1.2, coneEvery: 2, bucketEvery: 4, sockEvery: 6 },
-  { name: '终极草坪', waves: 5, baseCount: 7, step: 2, spawnGap: 1350, health: 1.62, speed: 1.18, damage: 1.28, coneEvery: 2, bucketEvery: 3, sockEvery: 5 }
+  { name: '终极草坪', waves: 5, baseCount: 6, step: 1, spawnGap: 1500, health: 1.48, speed: 1.12, damage: 1.18, coneEvery: 2, bucketEvery: 3, sockEvery: 6 }
 ];
 
 const S = {
@@ -32,7 +32,9 @@ const S = {
   lastSpawn: 0,
   lastPick: 0,
   prepareUntil: 0,
-  prepared: false
+  prepared: false,
+  pocketIndex: 0,
+  targetingCannon: null
 };
 
 const currentLevel = () => LEVELS[S.level];
@@ -43,14 +45,25 @@ function updateWaveText() {
   waveText.textContent = `第 ${S.level + 1} 关 · 第 ${S.wave} / ${currentLevel().waves} 波`;
 }
 
+const POCKET_IMAGES = Array.from({ length: 5 }, (_, index) => `assets/pocket-${index + 1}.webp`);
+
 const UNIT = {
   single: { name: '哼哼俊', cost: 4, cooldown: 4000, rate: 1250, damage: 22, hp: 140, img: 'assets/henghengjun.webp' },
   double: { name: '离轴盐', cost: 8, cooldown: 7000, rate: 1450, damage: 18, hp: 125, img: 'assets/lizhousalt.webp' },
   wall: { name: '建国', cost: 2, cooldown: 9000, rate: Infinity, damage: 0, hp: 650, img: 'assets/jianguo.webp' },
   squash: { name: '鸡蛋壳', cost: 2, cooldown: 10000, rate: Infinity, damage: 0, hp: 180, img: 'assets/eggshell.webp' },
   dancer: { name: '扩音器', cost: 0, cooldown: 10000, rate: Infinity, damage: 0, hp: 140, img: 'assets/speaker.webp' },
-  scare: { name: '周面', cost: 2, cooldown: 9000, rate: Infinity, damage: 0, hp: 170, img: 'assets/zhoumian.webp' }
+  scare: { name: '周面', cost: 2, cooldown: 9000, rate: Infinity, damage: 0, hp: 170, img: 'assets/zhoumian.webp' },
+  cannon: { name: '贝斯加农炮', cost: 10, cooldown: 2000, rate: Infinity, damage: 900, hp: 280, img: 'assets/bass-cannon.webp', reload: 2000 },
+  pocket: { name: '果汁说的裤兜', cost: 2, cooldown: 4000, rate: Infinity, damage: 0, hp: 135, img: POCKET_IMAGES[0], produceRate: 6000 }
 };
+
+const currentUnitImage = (type) => type === 'pocket' ? POCKET_IMAGES[S.pocketIndex % POCKET_IMAGES.length] : UNIT[type].img;
+
+function updatePocketCard() {
+  const image = $('#pocketCardImage');
+  if (image) image.src = currentUnitImage('pocket');
+}
 
 for (let r = 0; r < 5; r++) {
   for (let c = 0; c < 9; c++) {
@@ -106,7 +119,7 @@ function select(type, button) {
   } else {
     const unit = UNIT[type];
     box.className = 'selection-status';
-    box.innerHTML = `<span>手里拿着</span><img src="${unit.img}" alt=""><strong>${unit.name}</strong><small>本次只能放置 1 个 · 请选择格子</small>`;
+    box.innerHTML = `<span>手里拿着</span><img src="${currentUnitImage(type)}" alt=""><strong>${unit.name}</strong><small>本次只能放置 1 个 · 请选择格子</small>`;
   }
 }
 
@@ -124,7 +137,7 @@ function preview(cell, r, c) {
   }
   if (!occupied) {
     cell.classList.add('preview');
-    cell.style.setProperty('--preview', `url(${UNIT[S.selected].img})`);
+    cell.style.setProperty('--preview', `url(${currentUnitImage(S.selected)})`);
   }
 }
 
@@ -167,6 +180,7 @@ function place(r, c) {
   S.money -= unit.cost;
   S.cooldowns[type] = unit.cooldown;
   updateMoney();
+  const plantImage = currentUnitImage(type);
   const plant = {
     r,
     c,
@@ -174,17 +188,29 @@ function place(r, c) {
     hp: unit.hp,
     maxHp: unit.hp,
     lastShot: 0,
+    lastProduce: performance.now(),
+    lastCannonFire: -Infinity,
     triggered: false,
     el: document.createElement('div')
   };
   plant.el.className = `entity plant ${type}`;
-  plant.el.innerHTML = `<img src="${unit.img}" alt="${unit.name}">`;
+  plant.el.innerHTML = `<img src="${plantImage}" alt="${unit.name}">${type === 'cannon' ? '<span class="cannon-ready">点击发射</span>' : ''}`;
   const point = pos(r, c);
   plant.el.style.left = `${point.x}%`;
   plant.el.style.top = `${point.y}%`;
   board.append(plant.el);
   S.plants.push(plant);
-  pop(type === 'dancer' ? '开始跳舞！' : '放置成功', c / 9 * 100, r / 5 * 100);
+  if (type === 'cannon') {
+    plant.el.onclick = (event) => {
+      event.stopPropagation();
+      beginCannonTargeting(plant);
+    };
+  }
+  if (type === 'pocket') {
+    S.pocketIndex = (S.pocketIndex + 1) % POCKET_IMAGES.length;
+    updatePocketCard();
+  }
+  pop(type === 'dancer' ? '开始跳舞！' : type === 'cannon' ? '点击炮台发射' : '放置成功', c / 9 * 100, r / 5 * 100);
   clearSelection();
 }
 
@@ -245,6 +271,101 @@ function makeShot(plant, damage) {
   S.shots.push(shot);
 }
 
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+function beginCannonTargeting(plant) {
+  if (!S.running || S.paused || !plant.el.isConnected) return;
+  const remaining = UNIT.cannon.reload - (performance.now() - plant.lastCannonFire);
+  if (remaining > 0) {
+    pop(`装填中 ${Math.ceil(remaining / 1000)}秒`, (plant.c + .5) / 9 * 100, plant.r * 20 + 2);
+    return;
+  }
+  cancelCannonTargeting();
+  S.targetingCannon = plant;
+  plant.el.classList.add('aiming');
+  $('#targetOverlay').classList.add('show');
+}
+
+function cancelCannonTargeting() {
+  S.targetingCannon?.el?.classList.remove('aiming');
+  S.targetingCannon = null;
+  $('#targetOverlay').classList.remove('show');
+}
+
+function chooseCannonTarget(event) {
+  const plant = S.targetingCannon;
+  if (!plant) return;
+  const rect = board.getBoundingClientRect();
+  const localX = clamp((event.clientX - rect.left) / rect.width, 0, .999);
+  const localY = clamp((event.clientY - rect.top) / rect.height, 0, .999);
+  const targetRow = Math.floor(localY * 5);
+  const targetCol = Math.floor(localX * 9);
+  cancelCannonTargeting();
+  fireCannon(plant, targetRow, targetCol);
+}
+
+function fireCannon(plant, targetRow, targetCol) {
+  if (!plant.el.isConnected) return;
+  plant.lastCannonFire = performance.now();
+  plant.el.classList.add('firing');
+  const label = plant.el.querySelector('.cannon-ready');
+  if (label) label.textContent = '装填中';
+
+  const startX = (plant.c + .35) / 9 * 100;
+  const startY = (plant.r + .28) / 5 * 100;
+  const endX = (targetCol + .5) / 9 * 100;
+  const endY = (targetRow + .5) / 5 * 100;
+  const shell = document.createElement('div');
+  shell.className = 'cannon-shell';
+  shell.textContent = '♪';
+  shell.style.left = `${startX}%`;
+  shell.style.top = `${startY}%`;
+  board.append(shell);
+  shell.animate([
+    { left: `${startX}%`, top: `${startY}%`, transform: 'translate(-50%,-50%) rotate(0) scale(.75)' },
+    { offset: .48, left: `${(startX + endX) / 2}%`, top: '-12%', transform: 'translate(-50%,-50%) rotate(230deg) scale(1.2)' },
+    { left: `${endX}%`, top: `${endY}%`, transform: 'translate(-50%,-50%) rotate(520deg) scale(.9)' }
+  ], { duration: 1050, easing: 'cubic-bezier(.28,.72,.35,1)' });
+
+  setTimeout(() => {
+    shell.remove();
+    explodeCannon(targetRow, targetCol, UNIT.cannon.damage);
+  }, 1040);
+  setTimeout(() => plant.el?.classList.remove('firing'), 650);
+}
+
+function explodeCannon(targetRow, targetCol, damage) {
+  for (let row = Math.max(0, targetRow - 1); row <= Math.min(4, targetRow + 1); row++) {
+    for (let col = Math.max(0, targetCol - 1); col <= Math.min(8, targetCol + 1); col++) {
+      const blast = document.createElement('span');
+      blast.className = 'cannon-blast';
+      blast.style.left = `${col / 9 * 100}%`;
+      blast.style.top = `${row / 5 * 100}%`;
+      board.append(blast);
+      setTimeout(() => blast.remove(), 680);
+    }
+  }
+  S.enemies.forEach((enemy) => {
+    const enemyCol = clamp(Math.floor(enemy.x / 100 * 9), 0, 8);
+    if (Math.abs(enemy.r - targetRow) <= 1 && Math.abs(enemyCol - targetCol) <= 1) {
+      enemy.hp -= damage;
+      enemy.el.classList.add('hit');
+      setTimeout(() => enemy.el?.classList.remove('hit'), 180);
+    }
+  });
+  pop('轰！3×3 爆炸', (targetCol + .1) / 9 * 100, targetRow * 20 + 4);
+}
+
+function updateCannons(now) {
+  S.plants.filter((plant) => plant.type === 'cannon').forEach((plant) => {
+    const label = plant.el.querySelector('.cannon-ready');
+    if (!label) return;
+    const remaining = Math.max(0, UNIT.cannon.reload - (now - plant.lastCannonFire));
+    label.textContent = remaining ? `装填 ${Math.ceil(remaining / 1000)}` : '点击发射';
+    plant.el.classList.toggle('loaded', remaining === 0);
+  });
+}
+
 function triggerSquashes() {
   S.plants.filter((plant) => plant.type === 'squash' && !plant.triggered).forEach((plant) => {
     const plantX = (plant.c + 0.5) / 9 * 100;
@@ -290,14 +411,14 @@ function triggerScares(now) {
   });
 }
 
-function dropPick() {
+function createPick(x, y, target, produced = false) {
   const pick = {
-    x: 10 + Math.random() * 78,
-    y: -4,
-    target: 12 + Math.random() * 68,
+    x,
+    y,
+    target,
     el: document.createElement('button')
   };
-  pick.el.className = 'falling-pick';
+  pick.el.className = `falling-pick${produced ? ' produced' : ''}`;
   pick.el.innerHTML = '<img src="assets/pick.webp" alt="收集拨片">';
   pick.el.style.left = `${pick.x}%`;
   pick.el.onclick = () => {
@@ -311,6 +432,22 @@ function dropPick() {
   setTimeout(() => {
     if (pick.el.isConnected) remove(S.picks, pick);
   }, 7000);
+}
+
+function dropPick() {
+  createPick(10 + Math.random() * 78, -4, 12 + Math.random() * 68);
+}
+
+function triggerProducers(now) {
+  S.plants.filter((plant) => plant.type === 'pocket').forEach((plant) => {
+    if (now - plant.lastProduce < UNIT.pocket.produceRate) return;
+    plant.lastProduce = now;
+    const point = pos(plant.r, plant.c);
+    createPick(point.x + 3.2, point.y + 2, point.y + 2, true);
+    plant.el.classList.add('producing');
+    setTimeout(() => plant.el?.classList.remove('producing'), 420);
+    pop('裤兜掏出 +2 ◆', point.x, point.y);
+  });
 }
 
 function pop(text, x, y) {
@@ -379,6 +516,8 @@ function tick(now) {
   }
 
   S.plants.forEach((plant) => shoot(plant, now));
+  updateCannons(now);
+  triggerProducers(now);
   triggerSquashes();
   triggerScares(now);
   S.picks.forEach((pick) => {
@@ -447,6 +586,8 @@ function remove(array, item) {
 }
 
 function clearAll() {
+  cancelCannonTargeting();
+  board.querySelectorAll('.cannon-shell,.cannon-blast').forEach((element) => element.remove());
   [...S.plants, ...S.enemies, ...S.shots, ...S.picks].forEach((item) => item.el.remove());
   Object.assign(S, {
     money: 12,
@@ -465,9 +606,12 @@ function clearAll() {
     lastPick: 0,
     paused: false,
     prepareUntil: 0,
-    prepared: false
+    prepared: false,
+    pocketIndex: 0,
+    targetingCannon: null
   });
   board.dataset.level = String(S.level + 1);
+  updatePocketCard();
   clearSelection();
   updateMoney();
   waveText.textContent = `第 ${S.level + 1} 关 · 准备 10 秒`;
@@ -484,6 +628,7 @@ function start() {
 
 function finish(win) {
   if (!S.running) return;
+  cancelCannonTargeting();
   S.running = false;
   S.lastWin = win;
   const finalLevel = S.level === LEVELS.length - 1;
@@ -500,13 +645,18 @@ function continueGame() {
 }
 
 board.dataset.mode = 'none';
-$('#startBtn').onclick = () => {
-  S.level = 0;
-  start();
-};
+document.querySelectorAll('.level-btn').forEach((button) => {
+  button.onclick = () => {
+    S.level = Number(button.dataset.level);
+    document.querySelectorAll('.level-btn').forEach((item) => item.classList.toggle('selected', item === button));
+    $('#startBtn').textContent = `开始第 ${S.level + 1} 关`;
+  };
+});
+$('#startBtn').onclick = start;
 $('#restartBtn').onclick = continueGame;
 $('#pauseBtn').onclick = () => {
   if (!S.running) return;
+  cancelCannonTargeting();
   S.paused = true;
   $('#pauseScreen').classList.add('show');
 };
@@ -515,4 +665,14 @@ $('#resumeBtn').onclick = () => {
   S.time = performance.now();
   $('#pauseScreen').classList.remove('show');
 };
+$('#targetOverlay').onclick = chooseCannonTarget;
+$('#targetOverlay').onpointermove = (event) => {
+  const reticle = $('#targetReticle');
+  reticle.style.left = `${event.clientX}px`;
+  reticle.style.top = `${event.clientY}px`;
+};
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') cancelCannonTargeting();
+});
+updatePocketCard();
 updateMoney();

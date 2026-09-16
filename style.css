@@ -73,3 +73,43 @@
 @keyframes zombieShock{50%{transform:translateY(-10px) rotate(5deg) scale(1.04)}}
 @keyframes alertPop{from{opacity:0;transform:translateY(8px) scale(.4)}to{opacity:1;transform:none}}
 @media(max-width:760px){.cards{width:100%;gap:8px}.card{flex:0 0 100px;min-height:82px}.card img{height:42px}.shovel{flex:0 0 66px;min-height:72px}}
+
+/* Bass cannon, pocket producer, targeting mode, and level select */
+.cards{width:112px;gap:5px;max-height:680px;overflow-y:auto;overflow-x:visible;padding:0 6px 5px 0;scrollbar-width:thin;scrollbar-color:#f3c644 #171714}
+.cards:before{padding:3px 5px;font-size:11px;flex:0 0 auto}
+.card{height:68px;min-height:68px;padding:2px;flex:0 0 68px}
+.card img{height:33px}
+.card b{font-size:11px;line-height:1.02}
+.card small{font-size:9px;line-height:1}
+.cost{font-size:10px;padding:1px 3px}
+.shovel{min-height:40px;flex:0 0 40px}
+.plant.cannon{width:11.3%;height:18%;pointer-events:auto;cursor:crosshair;z-index:11}
+.plant.cannon>img{animation:none;transform-origin:14% 58%;transition:filter .15s}
+.plant.cannon.loaded>img{filter:drop-shadow(0 0 7px #ffe569) drop-shadow(3px 5px 2px #0008)}
+.plant.cannon.aiming>img{filter:drop-shadow(0 0 11px #fff36d) brightness(1.15)}
+.plant.cannon.firing>img{animation:cannonLift .64s cubic-bezier(.25,.8,.28,1)}
+.cannon-ready{position:absolute;left:5%;right:5%;bottom:-7px;padding:2px;background:#171714d9;color:#fff;text-align:center;font-size:9px;font-weight:900;border:1px solid #f3c644;pointer-events:none}
+.plant.pocket{width:9.8%;height:18%;overflow:hidden;border:3px solid #f3c644;background:#171714;box-shadow:3px 4px #000}
+.plant.pocket>img{animation:none;width:100%;height:100%;object-fit:cover;filter:none}
+.plant.pocket.producing{animation:pocketProduce .42s ease-out}
+.falling-pick.produced{width:44px;height:44px;animation:producedPick 1s ease-in-out infinite alternate;filter:drop-shadow(0 0 9px #ffe46f)}
+.cannon-shell{position:absolute;z-index:35;width:4.2%;min-width:22px;aspect-ratio:1;border:3px solid #171714;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 28%,#fff4a7,#efb62f 55%,#b83b28);color:#171714;font-size:clamp(15px,2vw,28px);font-weight:1000;pointer-events:none;box-shadow:0 0 14px #ffdf47}
+.cannon-blast{position:absolute;z-index:30;width:11.111%;height:20%;pointer-events:none;background:radial-gradient(circle,#fffbd5 0 9%,#ffd339 10% 25%,#ef6d25 28% 44%,#d83d2b99 48% 60%,transparent 66%);animation:cannonBlast .68s ease-out forwards}
+.target-overlay{display:none;position:fixed;z-index:160;inset:0;cursor:crosshair;background:#1114;touch-action:none}
+.target-overlay.show{display:block}
+.target-hint{position:fixed;z-index:2;left:50%;top:22px;transform:translateX(-50%);padding:10px 16px;background:#171714;color:#f3c644;border:3px solid #fff;font-weight:900;box-shadow:5px 5px #000;white-space:nowrap}
+.target-reticle{position:fixed;left:50%;top:50%;width:138px;height:138px;transform:translate(-50%,-50%);border:4px solid #ffe64f;border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px #171714,0 0 22px #ffe64f99;background:repeating-linear-gradient(90deg,transparent 0 32%,#ffe64f88 33% 34%,transparent 35% 65%,#ffe64f88 66% 67%,transparent 68%),repeating-linear-gradient(0deg,transparent 0 32%,#ffe64f88 33% 34%,transparent 35% 65%,#ffe64f88 66% 67%,transparent 68%)}
+.target-reticle:before,.target-reticle:after{content:'';position:absolute;background:#ffe64f;box-shadow:0 0 4px #171714}
+.target-reticle:before{left:50%;top:-18px;bottom:-18px;width:3px;transform:translateX(-50%)}
+.target-reticle:after{top:50%;left:-18px;right:-18px;height:3px;transform:translateY(-50%)}
+.level-select{margin:18px auto 2px;padding:10px;background:#171714;color:#fff;border:3px solid #171714}
+.level-select>strong{display:block;margin-bottom:8px;font-size:14px;letter-spacing:2px}
+.level-buttons{display:flex;justify-content:center;gap:8px}
+.poster .level-btn{width:44px;height:42px;margin:0;padding:0;background:#d9d2c2;color:#171714;border:3px solid #fff;box-shadow:none;font-size:17px}
+.poster .level-btn.selected{background:#f3c644;transform:translateY(-3px);box-shadow:0 4px #d94d37}
+.board[data-mode="cannon"] .cell,.board[data-mode="pocket"] .cell{box-shadow:inset 0 0 0 1px #f5d85b2e}
+@keyframes cannonLift{0%{transform:rotate(0)}42%{transform:rotate(-45deg) translateY(-2px)}72%{transform:rotate(-45deg) translateY(2px)}100%{transform:rotate(0)}}
+@keyframes cannonBlast{0%{opacity:0;transform:scale(.15)}38%{opacity:1;transform:scale(1.18)}100%{opacity:0;transform:scale(1.55)}}
+@keyframes pocketProduce{50%{transform:translateY(-7px) scale(1.08);filter:brightness(1.45)}}
+@keyframes producedPick{to{transform:translateY(-6px) rotate(8deg)}}
+@media(max-width:760px){.cards{width:100%;max-height:none;overflow-x:auto;overflow-y:hidden;gap:7px;padding:0 4px 8px}.card{flex:0 0 92px;height:78px;min-height:78px}.card img{height:40px}.target-hint{top:10px;font-size:11px;padding:7px 9px}.target-reticle{width:100px;height:100px}.plant.cannon{width:10.8%}}
