@@ -53,10 +53,53 @@ const UNIT = {
   dancer: { name: '扩音器', cost: 0, cooldown: 10000, rate: Infinity, damage: 0, hp: 140, img: 'assets/speaker.webp' },
   scare: { name: '周面', cost: 2, cooldown: 9000, rate: Infinity, damage: 0, hp: 170, img: 'assets/zhoumian.webp' },
   cannon: { name: '贝斯加农炮', cost: 10, cooldown: 2000, rate: Infinity, damage: 900, hp: 280, img: 'assets/bass-cannon.webp', reload: 2000 },
-  pocket: { name: '果汁说的裤子', cost: 2, cooldown: 4000, rate: Infinity, damage: 0, hp: 135, img: 'assets/pants.webp', produceRate: 6000 }
+  pocket: { name: '果汁说的裤子', cost: 2, cooldown: 4000, rate: Infinity, damage: 0, hp: 135, img: 'assets/pants.webp', produceRate: 8000 }
 };
 
 const currentUnitImage = (type) => UNIT[type].img;
+const LOADOUT_LIMIT = 6;
+const selectedLoadout = new Set();
+
+function updateStartButton() {
+  const count = selectedLoadout.size;
+  $('#loadoutCount').textContent = `${count} / ${LOADOUT_LIMIT}`;
+  $('#loadoutHint').textContent = count === LOADOUT_LIMIT ? '选择完成，可以开始游戏' : `还需要选择 ${LOADOUT_LIMIT - count} 种植物`;
+  $('#startBtn').disabled = count !== LOADOUT_LIMIT;
+  $('#startBtn').textContent = count === LOADOUT_LIMIT ? `开始第 ${S.level + 1} 关` : `请先选满 ${LOADOUT_LIMIT} 种植物`;
+}
+
+function renderLoadoutPicker() {
+  const grid = $('#loadoutGrid');
+  grid.innerHTML = '';
+  Object.entries(UNIT).forEach(([type, unit]) => {
+    const button = document.createElement('button');
+    button.className = 'loadout-option';
+    button.dataset.pickUnit = type;
+    button.setAttribute('aria-pressed', 'false');
+    button.innerHTML = `<span class="loadout-cost">${unit.cost} ◆</span><img src="${unit.img}" alt="${unit.name}"><b>${unit.name}</b>`;
+    button.onclick = () => {
+      if (selectedLoadout.has(type)) {
+        selectedLoadout.delete(type);
+      } else if (selectedLoadout.size < LOADOUT_LIMIT) {
+        selectedLoadout.add(type);
+      } else {
+        $('#loadoutHint').textContent = '最多只能选择 6 种，请先取消一种';
+        return;
+      }
+      button.classList.toggle('selected', selectedLoadout.has(type));
+      button.setAttribute('aria-pressed', String(selectedLoadout.has(type)));
+      updateStartButton();
+    };
+    grid.append(button);
+  });
+  updateStartButton();
+}
+
+function applyLoadout() {
+  document.querySelectorAll('.card').forEach((card) => {
+    card.classList.toggle('loadout-hidden', !selectedLoadout.has(card.dataset.unit));
+  });
+}
 
 for (let r = 0; r < 5; r++) {
   for (let c = 0; c < 9; c++) {
@@ -606,6 +649,11 @@ function clearAll() {
 }
 
 function start() {
+  if (selectedLoadout.size !== LOADOUT_LIMIT) {
+    updateStartButton();
+    return;
+  }
+  applyLoadout();
   clearAll();
   S.running = true;
   S.prepareUntil = performance.now() + 10000;
@@ -636,7 +684,7 @@ document.querySelectorAll('.level-btn').forEach((button) => {
   button.onclick = () => {
     S.level = Number(button.dataset.level);
     document.querySelectorAll('.level-btn').forEach((item) => item.classList.toggle('selected', item === button));
-    $('#startBtn').textContent = `开始第 ${S.level + 1} 关`;
+    updateStartButton();
   };
 });
 $('#startBtn').onclick = start;
@@ -670,4 +718,5 @@ $('#targetOverlay').onpointermove = (event) => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') cancelCannonTargeting();
 });
+renderLoadoutPicker();
 updateMoney();
