@@ -11,6 +11,7 @@ const LEVELS = [
   { name: '袜子危机', waves: 4, baseCount: 7, step: 1, spawnGap: 1550, health: 1.42, speed: 1.13, damage: 1.2, coneEvery: 2, bucketEvery: 4, sockEvery: 6 },
   { name: '终极草坪', waves: 5, baseCount: 6, step: 1, spawnGap: 1500, health: 1.48, speed: 1.12, damage: 1.18, coneEvery: 2, bucketEvery: 3, sockEvery: 6 }
 ];
+const ZOMBIE_SPEED_SCALE = 0.8;
 
 const S = {
   money: 12,
@@ -33,7 +34,6 @@ const S = {
   lastPick: 0,
   prepareUntil: 0,
   prepared: false,
-  pocketIndex: 0,
   targetingCannon: null
 };
 
@@ -45,8 +45,6 @@ function updateWaveText() {
   waveText.textContent = `第 ${S.level + 1} 关 · 第 ${S.wave} / ${currentLevel().waves} 波`;
 }
 
-const POCKET_IMAGES = Array.from({ length: 5 }, (_, index) => `assets/pocket-${index + 1}.webp`);
-
 const UNIT = {
   single: { name: '哼哼俊', cost: 4, cooldown: 4000, rate: 1250, damage: 22, hp: 140, img: 'assets/henghengjun.webp' },
   double: { name: '离轴盐', cost: 8, cooldown: 7000, rate: 1450, damage: 18, hp: 125, img: 'assets/lizhousalt.webp' },
@@ -55,15 +53,10 @@ const UNIT = {
   dancer: { name: '扩音器', cost: 0, cooldown: 10000, rate: Infinity, damage: 0, hp: 140, img: 'assets/speaker.webp' },
   scare: { name: '周面', cost: 2, cooldown: 9000, rate: Infinity, damage: 0, hp: 170, img: 'assets/zhoumian.webp' },
   cannon: { name: '贝斯加农炮', cost: 10, cooldown: 2000, rate: Infinity, damage: 900, hp: 280, img: 'assets/bass-cannon.webp', reload: 2000 },
-  pocket: { name: '果汁说的裤兜', cost: 2, cooldown: 4000, rate: Infinity, damage: 0, hp: 135, img: POCKET_IMAGES[0], produceRate: 6000 }
+  pocket: { name: '果汁说的裤子', cost: 2, cooldown: 4000, rate: Infinity, damage: 0, hp: 135, img: 'assets/pants.webp', produceRate: 6000 }
 };
 
-const currentUnitImage = (type) => type === 'pocket' ? POCKET_IMAGES[S.pocketIndex % POCKET_IMAGES.length] : UNIT[type].img;
-
-function updatePocketCard() {
-  const image = $('#pocketCardImage');
-  if (image) image.src = currentUnitImage('pocket');
-}
+const currentUnitImage = (type) => UNIT[type].img;
 
 for (let r = 0; r < 5; r++) {
   for (let c = 0; c < 9; c++) {
@@ -206,10 +199,6 @@ function place(r, c) {
       beginCannonTargeting(plant);
     };
   }
-  if (type === 'pocket') {
-    S.pocketIndex = (S.pocketIndex + 1) % POCKET_IMAGES.length;
-    updatePocketCard();
-  }
   pop(type === 'dancer' ? '开始跳舞！' : type === 'cannon' ? '点击炮台发射' : '放置成功', c / 9 * 100, r / 5 * 100);
   clearSelection();
 }
@@ -227,7 +216,7 @@ function spawn() {
     x: 94,
     hp,
     maxHp: hp,
-    speed: (socked ? 0.0035 : bucketed ? 0.0039 : coned ? 0.0045 : 0.0058) * config.speed,
+    speed: (socked ? 0.0035 : bucketed ? 0.0039 : coned ? 0.0045 : 0.0058) * config.speed * ZOMBIE_SPEED_SCALE,
     damage: Math.round((socked ? 30 : bucketed ? 24 : coned ? 20 : 13) * config.damage),
     lastBite: 0,
     stunnedUntil: 0,
@@ -607,11 +596,9 @@ function clearAll() {
     paused: false,
     prepareUntil: 0,
     prepared: false,
-    pocketIndex: 0,
     targetingCannon: null
   });
   board.dataset.level = String(S.level + 1);
-  updatePocketCard();
   clearSelection();
   updateMoney();
   waveText.textContent = `第 ${S.level + 1} 关 · 准备 10 秒`;
@@ -658,8 +645,17 @@ $('#pauseBtn').onclick = () => {
   if (!S.running) return;
   cancelCannonTargeting();
   S.paused = true;
+  document.querySelectorAll('.pause-level-btn').forEach((button) => {
+    button.classList.toggle('selected', Number(button.dataset.level) === S.level);
+  });
   $('#pauseScreen').classList.add('show');
 };
+document.querySelectorAll('.pause-level-btn').forEach((button) => {
+  button.onclick = () => {
+    S.level = Number(button.dataset.level);
+    start();
+  };
+});
 $('#resumeBtn').onclick = () => {
   S.paused = false;
   S.time = performance.now();
@@ -674,5 +670,4 @@ $('#targetOverlay').onpointermove = (event) => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') cancelCannonTargeting();
 });
-updatePocketCard();
 updateMoney();
