@@ -142,3 +142,8 @@
 .poster #startBtn:disabled{cursor:not-allowed;filter:grayscale(1);opacity:.55;box-shadow:2px 2px #000}
 .card.loadout-hidden{display:none}
 @media(max-width:560px){#startScreen .poster{padding:18px 14px}.loadout-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.poster .loadout-option{height:88px}.poster .loadout-option img{height:53px}}
+
+/* Two-cell bass cannon placement */
+.plant.cannon{width:21.6%;height:18%}
+.cell.preview-wide:after{left:4%;right:auto;top:4%;bottom:4%;width:192%;background-size:contain;background-position:center}
+.cell.preview-reserved{background:#f6d85b35;box-shadow:inset 0 0 0 3px #ffe477}

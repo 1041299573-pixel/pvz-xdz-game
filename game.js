@@ -101,6 +101,29 @@ function applyLoadout() {
   });
 }
 
+function resetLoadoutPicker() {
+  selectedLoadout.clear();
+  document.querySelectorAll('.loadout-option').forEach((button) => {
+    button.classList.remove('selected');
+    button.setAttribute('aria-pressed', 'false');
+  });
+  document.querySelectorAll('.card').forEach((card) => card.classList.remove('loadout-hidden'));
+  updateStartButton();
+}
+
+function clearCellPreviews() {
+  document.querySelectorAll('.cell').forEach((cell) => cell.classList.remove('preview', 'preview-wide', 'preview-reserved', 'remove-preview'));
+}
+
+const cellAt = (r, c) => board.children[r * 9 + c];
+const plantSpan = (plant) => plant.span || 1;
+const plantAt = (r, c) => S.plants.find((plant) => plant.r === r && c >= plant.c && c < plant.c + plantSpan(plant));
+const canPlace = (type, r, c) => {
+  const span = type === 'cannon' ? 2 : 1;
+  if (c + span > 9) return false;
+  return Array.from({ length: span }, (_, offset) => c + offset).every((column) => !plantAt(r, column));
+};
+
 for (let r = 0; r < 5; r++) {
   for (let c = 0; c < 9; c++) {
     const cell = document.createElement('button');
@@ -108,7 +131,7 @@ for (let r = 0; r < 5; r++) {
     cell.ariaLabel = `第${r + 1}行第${c + 1}列`;
     cell.onclick = () => place(r, c);
     cell.onmouseenter = () => preview(cell, r, c);
-    cell.onmouseleave = () => cell.classList.remove('preview', 'remove-preview');
+    cell.onmouseleave = clearCellPreviews;
     board.append(cell);
   }
 }
@@ -155,7 +178,8 @@ function select(type, button) {
   } else {
     const unit = UNIT[type];
     box.className = 'selection-status';
-    box.innerHTML = `<span>手里拿着</span><img src="${currentUnitImage(type)}" alt=""><strong>${unit.name}</strong><small>本次只能放置 1 个 · 请选择格子</small>`;
+    const placementHint = type === 'cannon' ? '横向占 2 格 · 请选择左侧起点' : '本次只能放置 1 个 · 请选择格子';
+    box.innerHTML = `<span>手里拿着</span><img src="${currentUnitImage(type)}" alt=""><strong>${unit.name}</strong><small>${placementHint}</small>`;
   }
 }
 
@@ -166,14 +190,18 @@ $('#shovel').onclick = (event) => select('shovel', event.currentTarget);
 
 function preview(cell, r, c) {
   if (!S.selected) return;
-  const occupied = S.plants.some((plant) => plant.r === r && plant.c === c);
+  const occupied = plantAt(r, c);
   if (S.selected === 'shovel') {
     if (occupied) cell.classList.add('remove-preview');
     return;
   }
-  if (!occupied) {
+  if (canPlace(S.selected, r, c)) {
     cell.classList.add('preview');
     cell.style.setProperty('--preview', `url(${currentUnitImage(S.selected)})`);
+    if (S.selected === 'cannon') {
+      cell.classList.add('preview-wide');
+      cellAt(r, c + 1).classList.add('preview-reserved');
+    }
   }
 }
 
@@ -186,7 +214,7 @@ function place(r, c) {
     return;
   }
 
-  const old = S.plants.find((plant) => plant.r === r && plant.c === c);
+  const old = plantAt(r, c);
   if (S.selected === 'shovel') {
     if (old) {
       remove(S.plants, old);
@@ -195,12 +223,12 @@ function place(r, c) {
     }
     return;
   }
-  if (old) {
-    pop('这里已经有人了', c / 9 * 100, r / 5 * 100);
+  const type = S.selected;
+  if (!canPlace(type, r, c)) {
+    pop(type === 'cannon' && c === 8 ? '加农炮需要横向两格' : '所需格子已被占用', c / 9 * 100, r / 5 * 100);
     return;
   }
 
-  const type = S.selected;
   const unit = UNIT[type];
   if ((S.cooldowns[type] || 0) > 0) {
     pop(`${unit.name}还在休眠`, c / 9 * 100, r / 5 * 100);
@@ -221,6 +249,7 @@ function place(r, c) {
     r,
     c,
     type,
+    span: type === 'cannon' ? 2 : 1,
     hp: unit.hp,
     maxHp: unit.hp,
     lastShot: 0,
@@ -573,7 +602,7 @@ function tick(now) {
 
   S.enemies.slice().forEach((enemy) => {
     if (now >= enemy.stunnedUntil) {
-      const blocker = S.plants.find((plant) => plant.type !== 'dancer' && plant.r === enemy.r && Math.abs((plant.c + 0.5) / 9 * 100 - enemy.x) < 5);
+      const blocker = S.plants.find((plant) => plant.type !== 'dancer' && plant.r === enemy.r && Math.abs((plant.c + plantSpan(plant) - 0.5) / 9 * 100 - enemy.x) < 5);
       if (blocker) {
         if (now - enemy.lastBite > 850) {
           blocker.hp -= enemy.damage;
@@ -661,6 +690,18 @@ function start() {
   requestAnimationFrame(tick);
 }
 
+function openLoadoutScreen() {
+  cancelCannonTargeting();
+  S.running = false;
+  clearAll();
+  resetLoadoutPicker();
+  document.querySelectorAll('.level-btn').forEach((button) => {
+    button.classList.toggle('selected', Number(button.dataset.level) === S.level);
+  });
+  document.querySelectorAll('.overlay.show').forEach((overlay) => overlay.classList.remove('show'));
+  $('#startScreen').classList.add('show');
+}
+
 function finish(win) {
   if (!S.running) return;
   cancelCannonTargeting();
@@ -670,13 +711,13 @@ function finish(win) {
   $('#resultKicker').textContent = win ? 'ENCORE!' : 'SHOW OVER';
   $('#resultTitle').textContent = win ? finalLevel ? '全部通关！' : `第 ${S.level + 1} 关通过` : '防线失守';
   $('#resultText').textContent = win ? finalLevel ? '五个关卡全部完成。' : `下一关：${LEVELS[S.level + 1].name}` : `第 ${S.level + 1} 关还可以再试一次。`;
-  $('#restartBtn').textContent = win ? finalLevel ? '重新挑战' : '下一关' : '重试本关';
+  $('#restartBtn').textContent = win ? finalLevel ? '重新选植物挑战' : '为下一关选择植物' : '重新选择植物';
   $('#endScreen').classList.add('show');
 }
 
 function continueGame() {
   if (S.lastWin) S.level = S.level < LEVELS.length - 1 ? S.level + 1 : 0;
-  start();
+  openLoadoutScreen();
 }
 
 board.dataset.mode = 'none';
@@ -701,7 +742,7 @@ $('#pauseBtn').onclick = () => {
 document.querySelectorAll('.pause-level-btn').forEach((button) => {
   button.onclick = () => {
     S.level = Number(button.dataset.level);
-    start();
+    openLoadoutScreen();
   };
 });
 $('#resumeBtn').onclick = () => {
