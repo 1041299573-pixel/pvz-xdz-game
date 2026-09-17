@@ -53,7 +53,7 @@ const UNIT = {
   dancer: { name: '扩音器', cost: 0, cooldown: 10000, rate: Infinity, damage: 0, hp: 140, img: 'assets/speaker.webp' },
   scare: { name: '周面', cost: 2, cooldown: 9000, rate: Infinity, damage: 0, hp: 170, img: 'assets/zhoumian.webp' },
   cannon: { name: '贝斯加农炮', cost: 10, cooldown: 2000, rate: Infinity, damage: 900, hp: 280, img: 'assets/bass-cannon.webp', reload: 2000 },
-  pocket: { name: '果汁说的裤子', cost: 2, cooldown: 4000, rate: Infinity, damage: 0, hp: 135, img: 'assets/pants.webp', produceRate: 8000 }
+  pocket: { name: '果汁说的裤子', cost: 2, cooldown: 4000, rate: Infinity, damage: 0, hp: 135, img: 'assets/pants.webp', produceRate: 16000 }
 };
 
 const currentUnitImage = (type) => UNIT[type].img;
